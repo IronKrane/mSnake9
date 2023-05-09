@@ -3,16 +3,15 @@ import random
 pygame.init()
 
 
-WIDTH, HEIGHT, GRID_SIZE = 500, 500, 10
+WIDTH, HEIGHT, GRID_SIZE = 600, 600, 20
 WINDOW = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption('MegaWąż9')
 SCORE_FONT = pygame.font.SysFont('Consolas', 30)
 CLOCK = pygame.time.Clock()
-FPS, VELOCITY = 30, 3
-SNAKE_START_LENGTH = 30
-RED, GREEN, BLUE = (255, 0, 0), (0, 255, 0), (0, 0, 255)
-WHITE, LIGHT_GRAY, DARK_GREY, BLACK = (255, 255, 255), (150, 150, 150), (100, 100, 100), (0, 0, 0)
-
+FPS, VELOCITY = 60, 1
+SNAKE_START_LENGTH = 5
+RED, GREEN, BLUE = (255, 0, 0), (0, 255, 0), (150, 150, 255)
+WHITE, LIGHT_GRAY, DARK_GREY, BLACK = (255, 255, 255), (250, 250, 250), (200, 200, 200), (0, 0, 0)
 
 class mSnake9:
     def __init__(self, x, y):
@@ -20,29 +19,29 @@ class mSnake9:
         self.y = self.original_y = y
         self.direction = ''
         self.on_the_move = False
-        self.step = 1
+        self.step = GRID_SIZE
         self.segments = []
-        
+        self.growth = 5
         
         for i in range(SNAKE_START_LENGTH):
             self.segments.append((self.x, self.y))
             
     def add_segment(self):          
         (x, y) = self.segments[-1]
-        for i in range(GRID_SIZE):
+        for i in range(self.growth):
             new_segment = (x, y)
-            # new_segment = (x+(i*GRID_SIZE)%WIDTH, y+(i*GRID_SIZE)%WIDTH)
-            # new_segment = (self.segment[0], self.segment[1])
             self.segments.append(new_segment)
-            # print(new_segment)
-        
 
     def draw(self, WINDOW):      
         for index, segment in enumerate(self.segments):
-            if index <= 2:
-                pygame.draw.rect(WINDOW, RED, (segment[0], segment[1], GRID_SIZE, GRID_SIZE))
+            if index < 1:
+                head_rect = (segment[0], segment[1], GRID_SIZE, GRID_SIZE)
+                pygame.draw.rect(WINDOW, RED, head_rect)
+                pygame.draw.rect(WINDOW, BLACK, head_rect, 1) # single pixel border for better visibility
             else:
-                pygame.draw.rect(WINDOW, BLACK, (segment[0], segment[1], GRID_SIZE, GRID_SIZE))        
+                body_rect = (segment[0], segment[1], GRID_SIZE, GRID_SIZE)
+                pygame.draw.rect(WINDOW, BLUE, body_rect)        
+                pygame.draw.rect(WINDOW, BLACK, body_rect, 1) # single pixel border for better visibility
 
     def move(self):
         keys = pygame.key.get_pressed()
@@ -68,9 +67,8 @@ class mSnake9:
         if self.direction == 'left':
             self.x -= (self.step * VELOCITY)
 
-        self.segments.insert(0, (self.x, self.y))   #todo needs a rework to fit the grid
+        self.segments.insert(0, (self.x, self.y))
         self.segments.pop()
-        
 
     def reset(self):
         self.x = self.original_x
@@ -80,7 +78,6 @@ class mSnake9:
         self.segments.clear()
         for i in range(SNAKE_START_LENGTH):
             self.segments.append((self.x, self.y))
-        
 
 class Food:
     def __init__(self, color):
@@ -88,38 +85,29 @@ class Food:
         self.food_position_y = random.randrange(GRID_SIZE, HEIGHT - GRID_SIZE, GRID_SIZE)
         
     def draw(self, WINDOW, color):
-        pygame.draw.rect(WINDOW, color, (self.food_position_x, self.food_position_y, GRID_SIZE, GRID_SIZE))
-
+        food_rect = (self.food_position_x, self.food_position_y, GRID_SIZE, GRID_SIZE)
+        pygame.draw.rect(WINDOW, color, food_rect)
+        pygame.draw.rect(WINDOW, BLACK, food_rect, 1) # single pixel border for better visibility
 
 def collision_check(score, snake, food):
     snake_head_rect = pygame.Rect(snake.segments[0][0], snake.segments[0][1], GRID_SIZE, GRID_SIZE)
     food_rect = pygame.Rect(food.food_position_x, food.food_position_y, GRID_SIZE, GRID_SIZE)
     
-    if snake_head_rect.colliderect(food_rect):
+    if snake_head_rect.colliderect(food_rect):                          # collision check between snake head and food
         score += 1
         food.food_position_x = random.randrange(GRID_SIZE, WIDTH - GRID_SIZE, GRID_SIZE)
         food.food_position_y = random.randrange(GRID_SIZE, HEIGHT - GRID_SIZE, GRID_SIZE)
         snake.add_segment()
-        # for i in range(50):
-        #     snake.segments.append(snake.segments[-1])
         
     if (snake.x < 0 or snake.x > WIDTH or snake.y < 0 or snake.y > HEIGHT) and snake.on_the_move == True:
-        score = 0
+        score = 0                                                       # collision check with a boundary of the window
         snake.reset()
         
-    # if snake.direction != '' and len(snake.segments) > (SNAKE_START_LENGTH) and len(snake.segments) != len(set(snake.segments)):
-    # if snake.direction != '' and len(snake.segments) != len(set(snake.segments)):
-    #     score -= 1
-    #     snake.reset()
-    # else:
-    #     pass
-    
-    for segment in snake.segments[1:]:
-        if segment == snake.segments[0] and snake.on_the_move == True:
-            score = 0
-            snake.reset()
+    for segment in snake.segments[1:]:                                  # loop thru every segment in the list except first one
+        if segment == snake.segments[0] and snake.on_the_move == True:  # and check if it is a duplicate with a first one
+            score = 0                                                   # if true then we have a collision with a tail
+            snake.reset()                                               # snake must be moving otherwise we get collision at the starting position
             break
-        
         
     return score
 
@@ -139,6 +127,7 @@ def main():
     snake = mSnake9(WIDTH // 2, HEIGHT // 2)
     score = 0    
     food_normal = Food(GREEN)
+    last = pygame.time.get_ticks()
     
     while run:   # main event loop
         CLOCK.tick(FPS)     # regulates speed of a while loop, have influence on speed of the snake
@@ -154,9 +143,13 @@ def main():
                 print(pygame.key.name(event.key))
         
         
-        snake.move()
-        
-        
+        # snake.move()
+        # pygame.time.delay(100)
+        cooldown = 100                  #todo needs refining, right now game is either unresponsive or too fast
+        now = pygame.time.get_ticks()   #* I think check for key input should be here for responsiveness and passed down into move function
+        if now - last >= cooldown:
+            last = now
+            snake.move()
         
         score = collision_check(score, snake, food_normal)
         
@@ -166,6 +159,5 @@ def main():
         
     pygame.quit()
     exit()
-
 
 main()
